@@ -85,3 +85,6 @@ docs/
 # Dotenv file
 .env
 
+contracts/.secret
+contracts/.env
+contracts/node_modules
