@@ -1,0 +1,116 @@
+@page "/start-contract"
+@rendermode InteractiveServer
+@attribute [StreamRendering]
+
+
+@using NodeClient.Data.Model
+@using NodeClient.Extensions
+
+@using Microsoft.AspNetCore.Authorization
+@using NodeClient.Components.Account
+@using System.Net
+@using System.Text.Json
+@using Microsoft.AspNetCore.Identity
+@using NodeClient.Data
+
+@attribute [Authorize]
+
+
+
+@inject INodeService _NodeService
+@inject ILogger<StartContract> Logger
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider GetAuthenticationStateAsync
+@inject NavigationManager NavManager
+
+<MudText class="mb-3" Typo="Typo.h3">Start new contract</MudText>
+
+
+<MudSelect @ref="_company" T="Company" Label="Supplier" Variant="Variant.Filled" AnchorOrigin="Origin.BottomCenter">
+    @foreach (var c in _companyCollection)
+    {
+        <MudSelectItem T="Company" Value="@c">@c.Name</MudSelectItem>
+    }
+</MudSelect>
+<br/>
+<MudSelect @ref="_product" T="Product" Label="Product" Variant="Variant.Filled" AnchorOrigin="Origin.BottomCenter">
+    @foreach (var p in _productCollection)
+    {
+        <MudSelectItem Value="@p">@(p.Name + "  " + p.Price)</MudSelectItem>
+    }
+</MudSelect>
+<br/>
+<MudTextField T="int" @bind-Value="_quantity" Label="Quantity" Variant="Variant.Outlined"></MudTextField>
+<br/>
+<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OnStartContract">Send</MudButton>
+
+<br/>
+<br/>
+
+@if (_responseStatus != string.Empty)
+{
+    <MudText Typo="Typo.h4" Color="Color.Error">@_responseStatus</MudText>
+}
+
+
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private MudSelect<Company> _company;
+    private MudSelect<Product> _product;
+    private int _quantity;
+
+    private IEnumerable<Company>? _companyCollection = [];
+    private IEnumerable<Product>? _productCollection = [];
+
+    private string _responseStatus = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation($"Getting suppliers..");
+        _companyCollection = await _NodeService.GetCompaniesAsync();
+        _companyCollection = _companyCollection!.Where(c => c.Role.Equals("Supplier")).ToList();
+        Logger.LogInformation($"Suppliers: {_companyCollection.Count()}");
+
+        Logger.LogInformation($"Getting products..");
+        _productCollection = await _NodeService.GetProductsAsync();
+        Logger.LogInformation($"Products: {_productCollection.Count()}");
+    }
+
+    private async void OnStartContract()
+    {
+        var user = await UserManager.GetUserAsync((await GetAuthenticationStateAsync.GetAuthenticationStateAsync()).User);
+        
+        if (_company.SelectedValues.Count() != 0 &&
+            _product.SelectedValues.Count() != 0 &&
+            _quantity != 0)
+        {
+            Logger.LogInformation($"Starting contract with: " +
+                                  $"\n\t{_company.SelectedValues.First().Name}" +
+                                  $"\n\t{_product.SelectedValues.First().Name}" +
+                                  $"\n\t{_quantity}");
+
+            var response = await _NodeService.StartNewContractAsync(_company.SelectedValues.First(),
+                _product.SelectedValues.First(), _quantity, user.Account);
+
+            if (response.StatusCode == HttpStatusCode.Accepted)
+            {
+                Logger.LogInformation("Contracted started successfully");
+                NavManager.NavigateTo("contracts");
+            }
+            else
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                _responseStatus = JsonSerializer.Deserialize<string>(content)!;
+                Logger.LogInformation(_responseStatus);
+            }
+        }
+        else
+        {
+            Logger.LogInformation($"Failed starting contract with: " +
+                                  $"\n\t{_company.SelectedValues.Count()}" +
+                                  $"\n\t{_product.SelectedValues.Count()}" +
+                                  $"\n\t{_quantity}");
+        }
+    }
+}

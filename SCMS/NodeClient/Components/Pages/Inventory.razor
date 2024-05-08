@@ -1,0 +1,53 @@
+@page "/inventory"
+@attribute [StreamRendering]
+
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize]
+
+@inject INodeService _NodeService
+@inject ILogger<Inventory> Logger
+
+<PageTitle>Inventory</PageTitle>
+
+<h1>Inventory</h1>
+
+@using NodeClient.Extensions
+
+<MudTable Items="@_inventoryCollection" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info">
+    <HeaderContent>
+        <MudTh>Product</MudTh>
+        <MudTh>Quantity</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Product">@context.Product_name</MudTd>
+        <MudTd DataLabel="Quantity">@context.Quantity</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No matching records found</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Loading...</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    private IEnumerable<Data.Model.Inventory>? _inventoryCollection = [];
+
+    private bool _loading = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _inventoryCollection = await _NodeService.GetInventoryAsync();
+        var productCollection = await _NodeService.GetProductsAsync();
+        _loading = false;
+        
+        string info = "";
+        foreach (var inventory in _inventoryCollection)
+        {
+            info += "Product: " + inventory.Product_name + " ";
+            info += "Quantity:" + inventory.Quantity + " ";
+        }
+        Logger.LogInformation($"Contracts: {info}");
+    }
+}

@@ -1,0 +1,26 @@
+--GET
+curl http://localhost:8001/contract-fulfilment/id
+
+
+--start contract
+curl -X POST   http://127.0.0.1:8001/start-contract -H "Content-Type: application/json"   -d '{
+   	"account_client": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+   	"client": "Node1",
+   	"product_id": 1,
+   	"product": "screw",
+   	"quantity": 5
+ }'
+
+
+--deliver
+curl -X POST http://127.0.0.1:8001/deliver/id  -H "Content-Type: application/json"   -d '{
+   	"to": ""
+ }'
+
+
+--receive
+curl http://localhost:8001/receive/id
+
+
+--end-contract
+curl -X POST  http://localhost:8001/end-contract/id

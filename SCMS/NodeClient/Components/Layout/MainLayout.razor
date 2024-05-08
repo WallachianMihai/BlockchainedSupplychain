@@ -1,0 +1,36 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider @rendermode="InteractiveServer" />
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu/>
+    </div>
+
+    <main>
+      <AuthorizeView>
+          <Authorized>
+              <div class="top-row px-4">
+                  <p>@context.User.Identity?.Name</p>
+              </div>
+          </Authorized>
+          <NotAuthorized>
+              <div class="top-row px-4">
+                  <p>Not logged in!</p>
+              </div>
+          </NotAuthorized>
+      </AuthorizeView>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>

@@ -1,0 +1,8 @@
+{
+  "name": "SupplyChain",
+  "user": "postgres",
+  "password": "admin",
+  "host": "localhost",
+  "port": 5432,
+  "blockchain-service": "http://127.0.0.1:8000"
+}

@@ -1,0 +1,54 @@
+﻿@page "/customers"
+@attribute [StreamRendering]
+
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize]
+
+@inject INodeService _NodeService
+@inject ILogger<Contracts> Logger
+
+<PageTitle>Companies</PageTitle>
+
+<h1>Companies</h1>
+
+@using NodeClient.Data.Model
+@using NodeClient.Extensions
+
+<MudTable Items="@_companyCollection" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info">
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        <MudTh>Location</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd DataLabel="Location">@context.Location</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No matching records found</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Loading...</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    private IEnumerable<Company>? _companyCollection = [];
+
+    private bool _loading = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _companyCollection = await _NodeService.GetCompaniesAsync();
+        _loading = false;
+        
+        string info = "";
+        foreach (var company in _companyCollection!)
+        {
+            info += "Account: " + company.Account + " ";
+            info += "Name: " + company.Name + " ";
+            info += "Location:" + company.Location + " ";
+        }
+        Logger.LogInformation($"Companies: {info}");
+    }
+}

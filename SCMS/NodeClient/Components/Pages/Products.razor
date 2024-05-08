@@ -1,0 +1,57 @@
+@page "/products"
+
+@attribute [StreamRendering]
+
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize]
+
+@inject INodeService _NodeService
+@inject ILogger<Products> Logger
+
+<PageTitle>Products</PageTitle>
+
+<h1>Products</h1>
+
+@using NodeClient.Data.Model
+@using NodeClient.Extensions
+
+<MudTable Items="@_productCollection" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info">
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        <MudTh>Description</MudTh>
+        <MudTh>Price</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd DataLabel="Location">@context.Description</MudTd>
+        <MudTd DataLabel="Price">@context.Price</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No matching records found</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Loading...</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    private IEnumerable<Product>? _productCollection = [];
+
+    private bool _loading = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _productCollection = await _NodeService.GetProductsAsync();
+        _loading = false;
+
+        string info = "";
+        foreach (var product in _productCollection)
+        {
+            info += "Name: " + product.Name + " ";
+            info += "Description:" + product.Description + " ";
+            info += "Price:" + product.Price + " ";
+        }
+        Logger.LogInformation($"Contracts: {info}");
+    }
+}

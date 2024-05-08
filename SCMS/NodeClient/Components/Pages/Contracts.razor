@@ -1,0 +1,131 @@
+@page "/contracts"
+@attribute [StreamRendering]
+
+@using Microsoft.AspNetCore.Authorization
+@using NodeClient.Data.Model
+@using NodeClient.Extensions
+@using System.Diagnostics
+
+
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject INodeService _NodeService
+@inject ILogger<Contracts> Logger
+@inject NavigationManager navigationManager
+
+<PageTitle>Contracts</PageTitle>
+
+<h1>Contracts</h1>
+<br/>
+
+<MudButton class="mb-5" Color="Color.Secondary" Variant="Variant.Filled" OnClick="@(StartNewContract)">START CONTRACT</MudButton>
+
+<MudTable @ref="_mudTable" Items="@_contractCollection" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info" T="Contract">
+    <HeaderContent>
+        <MudTh>Company</MudTh>
+        <MudTh>Product</MudTh>
+        <MudTh>Quantity</MudTh>
+        <MudTh>Status</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Company">@context.Customer_id</MudTd>
+        <MudTd DataLabel="Product">@context.Product_id</MudTd>
+        <MudTd DataLabel="Quantity">@context.Quantity</MudTd>
+        <MudTd DataLabel="Status">
+            @if (_contractFulfilments.ContainsKey(context.Id))
+            {
+                var client = _contractFulfilments[context.Id]!.Item1;
+                var seller = _contractFulfilments[context.Id]!.Item2;
+                if (client == false && seller == false)
+                {
+                    <MudText Color="Color.Error">Unfulfilled</MudText>
+                }
+                else if (seller && client == false)
+                {
+                    <MudText Color="Color.Warning">Client must fulfil</MudText>
+                }
+                else if (seller && client)
+                {
+                    <MudText Color="Color.Success">Fulfilled</MudText>
+                }
+            }
+            else
+            {
+                <MudText Color="Color.Success">Fulfilled</MudText>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>context
+        <MudText>No matching records found</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Loading...</MudText>
+    </LoadingContent>
+</MudTable>
+<br/>
+<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OnOpenContractClick">Open Contract PDF</MudButton>
+
+@code {
+    private MudTable<Contract> _mudTable;
+    private IEnumerable<Contract>? _contractCollection = [];
+    private Dictionary<int, Tuple<bool, bool>?> _contractFulfilments = [];
+    private bool _loading = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _contractCollection = await _NodeService.GetContractsAsync();
+        
+        _loading = false;
+        string info = "";
+        foreach (var contract in _contractCollection)
+        {
+            _contractFulfilments.Add(contract.Id, await _NodeService.GetContractFulfilmentAsync(contract.Id));
+            info += "Id: " + contract.Id + " ";
+            info += "Company: " + contract.Customer_id + " ";
+            info += "Product:" + contract.Product_id + " ";
+            info += "Quantity:" + contract.Quantity + " ";
+            info += "Contract Path: " + contract.Contract_path + "\n";
+            info += $"Contract fulfilment: seller - {_contractFulfilments[contract.Id].Item2}; client - {_contractFulfilments[contract.Id].Item1}";
+        }
+        Logger.LogInformation($"Contracts:\n {info}");
+    }
+    
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _mudTable.SelectedItem = _contractCollection.First();
+            StateHasChanged();
+        }
+    }
+    
+    public void OnOpenContractClick()
+    {
+        if (_mudTable.SelectedItem != null)
+        {
+            try
+            {
+                using Process myProcess = new Process();
+                myProcess.StartInfo.FileName = "firefox";
+                myProcess.StartInfo.Arguments = _mudTable.SelectedItem.Contract_path;
+                myProcess.Start();
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e.Message);
+                throw;
+            }
+        }
+        else
+        {
+            Logger.LogWarning("No item selected in the table.");
+        }
+    }
+
+    public void StartNewContract()
+    {
+        navigationManager.NavigateTo("start-contract");
+    }
+    
+}
