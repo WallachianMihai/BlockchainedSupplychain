@@ -69,7 +69,7 @@ contract SC
 
         agreements[agreement_id].holder = msg.sender;
         agreements[agreement_id].trail.push(msg.sender);
-        agreements[agreement_id].nextHolder = address(0);
+        agreements[agreement_id].nextHolder = address(0);   
     }
 
     function endAgreement(uint256 agreement_id) external payable

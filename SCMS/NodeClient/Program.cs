@@ -5,7 +5,9 @@ using NodeClient.Components;
 using NodeClient.Components.Account;
 using NodeClient.Data;
 using NodeClient.Extensions;
+using Microsoft.AspNetCore.ResponseCompression;
 using MudBlazor.Services;
+using NodeClient.Components.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,9 +38,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
+
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[] { "application/octet-stream" });
+});
+
+builder.Services.AddControllers();
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<HandOverNotifier>();
 
 var app = builder.Build();
 
@@ -56,11 +68,20 @@ else
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+
+
+app.UseRouting();
+app.UseAuthorization();
 app.UseAntiforgery();
+
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAdditionalIdentityEndpoints();
+
+app.UseResponseCompression();
+app.MapHub<TransferHub>("/transferhub");
 
 app.Run();

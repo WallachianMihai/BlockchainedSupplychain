@@ -7,4 +7,5 @@ public class Contract
     public string Customer_id { get; init; } = null!;
     public int Quantity { get; init; }
     public string Contract_path { get; init; } = null!;
+    public string Seller_account { get; init; } = null!;
 }

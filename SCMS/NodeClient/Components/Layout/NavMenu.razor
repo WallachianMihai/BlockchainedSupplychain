@@ -1,6 +1,12 @@
-﻿@implements IDisposable
+﻿@using Microsoft.AspNetCore.SignalR.Client
+@using NodeClient.Data
+@using NodeClient.Data.Model
+@using Microsoft.AspNetCore.Identity
+@implements IDisposable
 
 @inject NavigationManager NavigationManager
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider GetAuthenticationStateAsync
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -16,27 +22,33 @@
             <Authorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="contracts" Match="NavLinkMatch.All">
-                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Contracts
+                        <span aria-hidden="true"></span> Contracts
                     </NavLink>
                 </div>
-
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="customers">
-                        <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Customers
-                    </NavLink>
-                </div>
-
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="products">
-                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Products
-                    </NavLink>
-                </div>
-
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="inventory">
-                        <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Inventory
-                    </NavLink>
-                </div>
+                
+                <AuthorizeView Roles="Supplier, Retailer" Context="AuthorizedContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="customers">
+                            <span aria-hidden="true"></span> Customers
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+             
+                <AuthorizeView Roles="Supplier, Retailer" Context="AuthorizedContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="products">
+                            <span aria-hidden="true"></span> Products
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+                
+                <AuthorizeView Roles="Supplier, Retailer" Context="AuthorizedContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="inventory">
+                            <span aria-hidden="true"></span> Inventory
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
         
                 <div class="nav-item px-3">
                     <form action="Account/Logout" method="post">
@@ -51,12 +63,12 @@
             <NotAuthorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
+                        <span class="bi-person-nav-menu" aria-hidden="true"></span> Register
                     </NavLink>
                 </div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
+                        <span class="bi-person-badge-nav-menu" aria-hidden="true"></span> Login
                     </NavLink>
                 </div>
             </NotAuthorized>
@@ -66,8 +78,9 @@
 
 @code {
     private string? currentUrl;
+    private HubConnection? _hubConnection;
 
-    protected override void OnInitialized()
+    protected override async void OnInitialized()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;

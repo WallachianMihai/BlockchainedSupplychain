@@ -1,11 +1,11 @@
+import requests
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from config.config import Config
 from utility.Contract import web3, contract, process_receipt
 from web3.exceptions import ContractLogicError, ContractCustomError, ContractPanicError
 from utility.ContractPDF import PDFHandler
-import logging
-import psycopg2
+import logging, json, psycopg2
 
 router = APIRouter(
     prefix="",
@@ -14,6 +14,7 @@ router = APIRouter(
 )
 
 logger = logging.getLogger(__name__)
+block_event = []
 
 @router.post('/start-contract', tags=['contract'])
 async def start_contract(request: Request):
@@ -65,6 +66,8 @@ async def start_contract(request: Request):
             return JSONResponse(
                 status_code=200,
                 content={
+                    "URL": (f"Success at method {request.method} at URL {request.url}."),
+                    "message": ("Success!"),
                     "status": ("OK")
                 },
             )
@@ -127,24 +130,11 @@ async def get_contract_fulfilment(id: int):
 async def get_contract_trail(id: int):
     try:
         result = contract.functions.getTrailHistory(id).call()
+        logger.info(f"Returned trail: {result}")
 
-        conn = psycopg2.connect(Config.CONNECTION_STRING)
-        cur = conn.cursor()
+        logger.info(f"Trail of contract {id}: {result}")
 
-        sql = f"SELECT account, name from \"supply_chain\".\"Customer\""
-
-        cur.execute(sql)
-        data = cur.fetchall()
-
-        idx = -1
-        trail = [{idx + 1: row[1]} for row in data if row[0] in result]
-
-        cur.close()
-        conn.close()
-
-        logger.info(f"Trail of contract {id}: {trail}")
-
-        return JSONResponse(content=trail)
+        return JSONResponse(content=result)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=e)
@@ -187,6 +177,8 @@ async def next_destination(id: int, request: Request):
             return JSONResponse(
                 status_code=200,
                 content={
+                    "URL": (f"Success at method {request.method} at URL {request.url}."),
+                    "message": ("Success!"),
                     "status": ("OK")
                 },
             )
@@ -230,6 +222,27 @@ async def next_destination(id: int, request: Request):
             else:
                 raise HTTPException(status_code=500, detail=e)
 
+@router.get("/event", tags=['contract'])
+async def events(request: Request):
+    if request.method == "GET":
+        try:
+            body = dict()
+            event_filter = contract.events.transferProduct.create_filter(fromBlock='latest')
+            for event in event_filter.get_new_entries():
+                event_json = web3.to_json(event)
+                logger.info(f"Event: {event_json}")
+                data = json.loads(event_json)
+
+                body = {
+                    "holder": data["args"]["holder"],
+                    "new_holder": data["args"]["new_holder"],
+                    "agreement_id": data["args"]["agreement_id"]
+                }
+            logger.info(body)
+            return JSONResponse(content=body)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=e)
 
 @router.post('/receive/{id}', tags=['contract'])
 async def receive_product(id: int, request: Request):
@@ -247,6 +260,8 @@ async def receive_product(id: int, request: Request):
             return JSONResponse(
                 status_code=200,
                 content={
+                    "URL": (f"Success at method {request.method} at URL {request.url}."),
+                    "message": ("Success!"),
                     "status": ("OK")
                 },
             )
@@ -309,6 +324,8 @@ async def end_agreement(id: int, request: Request):
             return JSONResponse(
                 status_code=200,
                 content={
+                    "URL": (f"Success at method {request.method} at URL {request.url}."),
+                    "message": ("Success!"),
                     "status": ("OK")
                 },
             )

@@ -9,15 +9,14 @@ public class ContractData
     
     [JsonPropertyName("holder")]
     public string Holder { get; set; }
-    
-    [JsonPropertyName("next_holder")]
-    public int NextHolder { get; set; }
+
+    [JsonPropertyName("next_holder")] public string NextHolder { get; init; } = null!;
     
     [JsonPropertyName("client")]
     public string Client { get; set; }
     
     [JsonPropertyName("product")]
-    public int Product { get; set; }
+    public string Product { get; set; }
     
     [JsonPropertyName("quantity")]
     public int Quantity { get; set; }

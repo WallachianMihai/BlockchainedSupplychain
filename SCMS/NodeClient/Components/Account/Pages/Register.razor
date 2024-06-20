@@ -1,12 +1,14 @@
 ﻿@page "/Account/Register"
 
 @using System.ComponentModel.DataAnnotations
+@using Humanizer
 @using Microsoft.AspNetCore.Identity
 @using NodeClient.Data
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
+@inject RoleManager<IdentityRole> RoleManager;
 @inject ILogger<Register> Logger
 @inject IdentityRedirectManager RedirectManager
 
@@ -38,9 +40,13 @@
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger"/>
             </div>
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Account" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com"/>
+                <InputText @bind-Value="Input.Account" class="form-control" aria-required="true" placeholder="Account"/>
                 <label for="account">Wallet Account</label>
                 <ValidationMessage For="() => Input.Account" class="text-danger"/>
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Role" class="form-control" aria-required="true" placeholder="Role"/>
+                <label for="role">Role</label>
             </div>
             <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
         </EditForm>
@@ -58,14 +64,19 @@
     public async Task RegisterUser(EditContext editContext)
     {
         var user = CreateUser();
-        
+
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
         user.Account = Input.Account;
-        var result = await UserManager.CreateAsync(user, Input.Password);
 
-        if (!result.Succeeded)
+        var role = new IdentityRole(Input.Role);
+        
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        var addRoleResult = await RoleManager.CreateAsync(role);
+        var addUserRoleResult = await UserManager.AddToRoleAsync(user, Input.Role);
+        
+        if (!result.Succeeded && !addRoleResult.Succeeded && !addUserRoleResult.Succeeded)
         {
             identityErrors = result.Errors;
             return;
@@ -76,6 +87,7 @@
         await SignInManager.SignInAsync(user, isPersistent: false);
         RedirectManager.RedirectTo(ReturnUrl);
     }
+    
 
     private ApplicationUser CreateUser()
     {
@@ -117,11 +129,13 @@
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
         public string ConfirmPassword { get; set; } = "";
-        
+
         [Required]
         [StringLength(42, ErrorMessage = "The ethereum wallet {0} must be {1} characters long")]
         [Display(Name = "Account")]
         public string Account { get; set; } = "";
+        
+        [Display(Name = "Role")] public string Role { get; set; } = "";
     }
 
 }

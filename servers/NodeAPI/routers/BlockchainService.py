@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from utility.RequestHandler import GET, POST
@@ -87,7 +89,7 @@ async def next_destination(request: Request, id):
     if request.method == 'POST':
         try:
             body = await request.json()
-
+            logging.info(body)
             response = POST(Config.BLOCKCHAIN_API + f"/handover/{id}", body)
 
             if response["status"] == "revert":
@@ -161,25 +163,13 @@ async def end_agreement(request: Request, id):
             raise HTTPException(status_code=500, detail=e)
 
 
-@router.post('/events', tags=['contract'])
-async def events(request: Request):
-    if request.method == 'POST':
-        try:
-            body = await request.json()
-            event_buffer[body["new_holder"]] = body["agreement_id"]
-            logger.info(f"Transfer events: {event_buffer}")
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=e)
-
-
 @router.get('/events', tags=['contract'])
 async def events(request: Request):
     if request.method == 'GET':
         try:
-            return JSONResponse(
-                status_code=200,
-                content=event_buffer
-            )
+            body = GET(Config.BLOCKCHAIN_API + "/event")
+            logger.info(f"Event: {body}")
+
+            return JSONResponse(content=body)
         except Exception as e:
             raise HTTPException(status_code=500, detail=e)

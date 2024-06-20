@@ -4,39 +4,63 @@
 @using Microsoft.AspNetCore.Authorization
 @using NodeClient.Data.Model
 @using NodeClient.Extensions
+@using Microsoft.AspNetCore.SignalR.Client
 @using System.Diagnostics
-
+@using Microsoft.AspNetCore.Identity
+@using MudBlazor.Utilities
+@using NodeClient.Components.Pages.Dialog
+@using NodeClient.Data
 
 @attribute [Authorize]
 @rendermode InteractiveServer
 
+@implements IAsyncDisposable
+
 @inject INodeService _NodeService
 @inject ILogger<Contracts> Logger
 @inject NavigationManager navigationManager
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider GetAuthenticationStateAsync
+@inject IDialogService DialogService
+
+<MudDialogProvider
+    FullWidth="true"
+    MaxWidth="MaxWidth.ExtraSmall"
+    CloseButton="true"
+    DisableBackdropClick="true"
+    NoHeader="true"
+    Position="DialogPosition.Center"
+    CloseOnEscapeKey="true"
+/>
 
 <PageTitle>Contracts</PageTitle>
 
 <h1>Contracts</h1>
 <br/>
-
-<MudButton class="mb-5" Color="Color.Secondary" Variant="Variant.Filled" OnClick="@(StartNewContract)">START CONTRACT</MudButton>
-
-<MudTable @ref="_mudTable" Items="@_contractCollection" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info" T="Contract">
+<AuthorizeView Roles="Retailer">
+    <Authorized>
+        <MudButton class="mb-5" Color="Color.Secondary" Variant="Variant.Filled" OnClick="@(StartNewContract)">START CONTRACT</MudButton>
+    </Authorized>
+</AuthorizeView>
+<br/>
+<MudTable @ref="_mudTable" Items="@_contractCollection" RowsPerPage="5" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info" T="Contract" OnRowClick="@(args => OnTableRowClicked(args))" RowStyleFunc="@((item, idx) => TableRowStyle(item, idx))">
     <HeaderContent>
         <MudTh>Company</MudTh>
+        <MudTh>Seller</MudTh>
         <MudTh>Product</MudTh>
         <MudTh>Quantity</MudTh>
         <MudTh>Status</MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="Company">@context.Customer_id</MudTd>
-        <MudTd DataLabel="Product">@context.Product_id</MudTd>
+        <MudTd DataLabel="Company">@_companies.First(c => c.Account == context.Customer_id).Name</MudTd>
+        <MudTd DataLabel="Seller">@_companies.First(c => c.Account == context.Seller_account).Name</MudTd>
+        <MudTd DataLabel="Product">@_products.First(p => p.Id == context.Product_id).Name</MudTd>
         <MudTd DataLabel="Quantity">@context.Quantity</MudTd>
         <MudTd DataLabel="Status">
             @if (_contractFulfilments.ContainsKey(context.Id))
             {
-                var client = _contractFulfilments[context.Id]!.Item1;
-                var seller = _contractFulfilments[context.Id]!.Item2;
+                var client = _contractFulfilments[context.Id]!.Client;
+                var seller = _contractFulfilments[context.Id]!.Seller;
                 if (client == false && seller == false)
                 {
                     <MudText Color="Color.Error">Unfulfilled</MudText>
@@ -62,21 +86,152 @@
     <LoadingContent>
         <MudText>Loading...</MudText>
     </LoadingContent>
+    <PagerContent>
+        <MudPagination SelectedChanged="PageChanged" Count="@((_mudTable.GetFilteredItemsCount() + _mudTable.RowsPerPage - 1) / _mudTable.RowsPerPage)" Class="pa-4"/>
+    </PagerContent>
 </MudTable>
 <br/>
-<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OnOpenContractClick">Open Contract PDF</MudButton>
+<br/>
+@if (_selectedContract != null && _selectedContractTrail.Count() != 0)
+{ 
+    <MudPaper Class="pa-16 ma-2" Square="true">
+        <MudTimeline TimelineOrientation="TimelineOrientation.Horizontal" TimelinePosition="TimelinePosition.Alternate">
+            @foreach (var company in _selectedContractTrail)
+            {
+                @if (_selectedContract.Customer_id != company.Account)
+                {
+                    <MudTimelineItem Color="colors[rnd.Next(colors.Count)]" Variant="Variant.Filled">
+                        <ItemContent>
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText>@company.Name</MudText>
+                                    <MudText Typo="Typo.body2">@company.Location</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </ItemContent>
+                        <ItemOpposite>
+                            @if (company == _selectedContractTrail.First())
+                            {
+                                <MudChip Disabled="true" Color="Color.Primary">Seller</MudChip>
+                            }
+                            @if (company == _selectedContractTrail.Last())
+                            {
+                                <MudChip Disabled="true" Color="Color.Primary">Holder</MudChip>
+                            }
+                        </ItemOpposite>
+                    </MudTimelineItem>
+                }
+
+            }
+            <MudTimelineItem Color="colors[rnd.Next(colors.Count)]" Variant="Variant.Filled">
+                <ItemContent>
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText>@_companies.First(c => c.Account == _selectedContract.Customer_id).Name</MudText>
+                            <MudText Typo="Typo.body2">@_companies.First(c => c.Account == _selectedContract.Customer_id).Location</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </ItemContent>
+                <ItemOpposite>
+                    <MudChip Disabled="true" Color="Color.Primary">Client</MudChip>
+                    @if (_contractFulfilments[_selectedContract.Id].Seller && _contractFulfilments[_selectedContract.Id].Client == false)
+                    {
+                        <MudChip Disabled="true" Color="Color.Primary">Received</MudChip>
+                    }
+                    else if (_contractFulfilments[_selectedContract.Id].Client)
+                    {
+                        <MudChip Disabled="true" Color="Color.Primary">All Done</MudChip>
+                    }
+                </ItemOpposite>
+            </MudTimelineItem>
+        </MudTimeline>
+        <br/>
+        <br/>
+            
+        @if (_selectedContractNextHolder != "" &&
+             _selectedContractNextHolder != _user.Account)
+        {
+            <MudText Typo="Typo.h5" Color="Color.Info">Waiting confirmation from: @_companies.First(c => c.Account == @_selectedContractNextHolder).Name</MudText>
+        }
+        
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        @if (_selectedContractTrail.Last().Account == _user.Account &&
+             _selectedContract.Customer_id != _user.Account)
+        {
+            <MudButton Color="Color.Dark" Variant="Variant.Filled" OnClick="@(Deliver)">HAND OVER</MudButton>
+        }
+        else if (_contractReceiveActionMapper.ContainsKey(_selectedContract.Id) &&
+                 _contractReceiveActionMapper.ContainsValue(_user.Account))
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Dark" OnClick="@(e => Receive())">Receive</MudButton>
+        }
+        else if (_contractFulfilments[_selectedContract.Id].Seller &&
+                 !_contractFulfilments[_selectedContract.Id].Client &&
+                 _selectedContract.Customer_id == _user.Account)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Dark" OnClick="@(e => EndContract())">Pay and end contract</MudButton>
+        }
+        <MudButton Class="m-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="OnOpenContractClick">Open Contract PDF</MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="pa-16 ma-2" Square="true">
+         <MudText Typo="Typo.h2" Color="Color.Info">@_paperInfo</MudText>
+    </MudPaper>
+}
 
 @code {
+    private HubConnection? _hubConnection;
     private MudTable<Contract> _mudTable;
     private IEnumerable<Contract>? _contractCollection = [];
-    private Dictionary<int, Tuple<bool, bool>?> _contractFulfilments = [];
+    private IEnumerable<Company>? _selectedContractTrail = [];
+    private Contract? _selectedContract;
+    private string _selectedContractNextHolder = "";
+    private IEnumerable<Company>? _companies = [];
+    private IEnumerable<Product>? _products = [];
+    private Dictionary<int, string> _contractReceiveActionMapper = [];
+    private Dictionary<int, Fulfilment> _contractFulfilments = [];
     private bool _loading = true;
-    
+    private ApplicationUser? _user;
+    static Random rnd = new();
+    private List<Color> colors =
+    [
+        Color.Dark, Color.Default, Color.Primary,
+        Color.Error, Color.Info, Color.Inherit, Color.Secondary, Color.Success,
+        Color.Transparent, Color.Tertiary, Color.Surface, Color.Warning
+    ];
+
+    private string _paperInfo = "Loading...";
+
     protected override async Task OnInitializedAsync()
     {
         _contractCollection = await _NodeService.GetContractsAsync();
-        
+        _companies = await _NodeService.GetCompaniesAsync();
+        _products = await _NodeService.GetProductsAsync();
+        _paperInfo = "No contract selected";
         _loading = false;
+
+        _user = await UserManager.GetUserAsync((await GetAuthenticationStateAsync.GetAuthenticationStateAsync()).User);
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(navigationManager.ToAbsoluteUri("/transferhub"))
+            .Build();
+        
+        _hubConnection.On<TransferProductEvent>("ReceiveTransferDetails", (transferEvent) =>
+        {
+            Logger.LogInformation($"{transferEvent.AgreementId}, {transferEvent.NewHolder}, {transferEvent.Holder}, {_user.Account}");
+            _contractReceiveActionMapper[transferEvent.AgreementId] = transferEvent.NewHolder;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await _hubConnection.StartAsync();
+        
+        Logger.LogInformation("Staring notification hub");
+
         string info = "";
         foreach (var contract in _contractCollection)
         {
@@ -86,20 +241,51 @@
             info += "Product:" + contract.Product_id + " ";
             info += "Quantity:" + contract.Quantity + " ";
             info += "Contract Path: " + contract.Contract_path + "\n";
-            info += $"Contract fulfilment: seller - {_contractFulfilments[contract.Id].Item2}; client - {_contractFulfilments[contract.Id].Item1}";
+            info += $"Contract fulfilment: seller - {_contractFulfilments[contract.Id].Seller}; client - {_contractFulfilments[contract.Id].Client}\n";
         }
+
         Logger.LogInformation($"Contracts:\n {info}");
     }
-    
+
     protected override void OnAfterRender(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && _contractCollection?.Count() == 0)
         {
             _mudTable.SelectedItem = _contractCollection.First();
             StateHasChanged();
         }
     }
-    
+
+    private async void OnTableRowClicked(TableRowClickEventArgs<Contract> contract)
+    {
+        _paperInfo = "Loading...";
+        _selectedContract = contract.Item;
+        _selectedContractTrail = await _NodeService.GetContractTrailAsync(_selectedContract.Id);
+        var nextHolder = (await _NodeService.GetContractDataAsync(_selectedContract.Id))!.NextHolder;
+        _selectedContractNextHolder = nextHolder.Equals("0x0000000000000000000000000000000000000000") ? "" : nextHolder;
+        _paperInfo = "No contract selected";
+    }
+
+    private string TableRowStyle(Contract contract, int index)
+    {
+        if (_selectedContract != null && contract.Id == _selectedContract.Id)
+        {
+            return $"background: #D3D3D3";
+        }
+        if (_contractReceiveActionMapper.ContainsKey(contract.Id) &&
+            _contractReceiveActionMapper.ContainsValue(_user.Account))
+        {
+            return $"background: #5f71fa";
+        }
+        
+        return "";
+    }
+
+    private void PageChanged(int i)
+    {
+        _mudTable.NavigateTo(i - 1);
+    }
+
     public void OnOpenContractClick()
     {
         if (_mudTable.SelectedItem != null)
@@ -123,9 +309,55 @@
         }
     }
 
+    public async void Deliver()
+    {
+        if (_mudTable.SelectedItem != null)
+        {
+            try
+            {
+                Logger.LogInformation($"HAND OVER\n ");
+                var parameters = new DialogParameters<HandOverDialog> { { x => x.ContractId, _mudTable.SelectedItem.Id }, { x => x.Holder, _user.Account } };
+                var result = await DialogService.Show<HandOverDialog>("Hand Over", parameters).Result;
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e.Message);
+                throw;
+            }
+        }
+        else
+        {
+            Logger.LogWarning("No item selected in the table.");
+        }
+    }
+
+    public async void Receive()
+    {
+        await _NodeService.ReceiveAsync(_selectedContract.Id, _user.Account);
+        _contractReceiveActionMapper.Remove(_selectedContract.Id);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async void EndContract()
+    {
+        await _NodeService.EndContractAsync(_selectedContract.Id, _user.Account);
+        await InvokeAsync(StateHasChanged);
+    }
+
     public void StartNewContract()
     {
         navigationManager.NavigateTo("start-contract");
     }
-    
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null) await _hubConnection.DisposeAsync();
+        
+        if (UserManager is IAsyncDisposable userManagerAsyncDisposable)
+            await userManagerAsyncDisposable.DisposeAsync();
+        else if (UserManager != null)
+            UserManager.Dispose();
+    }
+
 }

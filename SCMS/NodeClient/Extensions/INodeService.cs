@@ -8,12 +8,12 @@ public interface INodeService
     Task<IEnumerable<Contract>?> GetContractsAsync();
     Task<IEnumerable<Inventory>?> GetInventoryAsync();
     Task<IEnumerable<Product>?> GetProductsAsync();
-    Task<Tuple<bool, bool>?> GetContractFulfilmentAsync(int contractId);
-    Task<IEnumerable<string>?> GetContractTrailAsync(int contractId);
+    Task<Fulfilment?> GetContractFulfilmentAsync(int contractId);
+    Task<IEnumerable<Company>?> GetContractTrailAsync(int contractId);
     Task<ContractData?> GetContractDataAsync(int contractId);
-
-    Task<HttpResponseMessage> StartNewContractAsync(Company supplier, Product product, int quatinty, string account);
-    Task<HttpResponseMessage> HandoverAsync(int contractId, string accountFrom, string accountTo);
-    Task<HttpResponseMessage> ReceiveAsync(int contractId, string accountFrom);
-    Task<HttpResponseMessage> EndContractAsync(int contractId, string accountFrom);
+    Task GetEvents();
+    Task<ApiFailedResponse> StartNewContractAsync(Company supplier, Product product, int quatinty, string account);
+    Task<ApiFailedResponse> HandoverAsync(int contractId, string accountFrom, string accountTo);
+    Task<ApiFailedResponse> ReceiveAsync(int contractId, string accountFrom);
+    Task<ApiFailedResponse> EndContractAsync(int contractId, string accountFrom);
 }

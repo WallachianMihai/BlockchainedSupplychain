@@ -120,7 +120,7 @@ async def get_contracts():
         conn = psycopg2.connect(Config.CONNECTION_STRING)
         cur = conn.cursor()
 
-        sql = "SELECT id, product_id, customer_account, quantity, contract_path FROM \"supply_chain\".\"Contract\";"
+        sql = "SELECT id, product_id, customer_account, quantity, contract_path, seller_account FROM \"supply_chain\".\"Contract\";"
 
         cur.execute(sql)
 
@@ -133,6 +133,7 @@ async def get_contracts():
                 "customer_id": row[2],
                 "quantity": row[3],
                 "contract_path": row[4],
+                "seller_account": row[5]
             }
             for row in data
         ]

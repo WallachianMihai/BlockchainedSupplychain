@@ -1,0 +1,56 @@
+@using NodeClient.Extensions
+@using NodeClient.Data.Model
+@using System.Net
+<MudDialog>
+    <DialogContent>
+        @foreach (var node in nodes)
+        {
+            <MudCard>
+                <MudCardContent>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="e => { HandOver(node.Account); }">@node.Name</MudButton>
+                </MudCardContent>
+            </MudCard>
+            <MudSpacer/>
+        }
+        @if (_message != string.Empty)
+        {
+            <MudText Color="Color.Error">@_message</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    [Inject] INodeService? NodeService { get; set; }
+
+    [Parameter] public int ContractId { get; set; }
+    [Parameter] public string Holder { get; set; }
+
+    private IEnumerable<Company>? nodes = [];
+    private string _message = string.Empty;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        MudDialog.Options.NoHeader = true;
+        
+        nodes = (await NodeService.GetCompaniesAsync());
+    }
+
+    private async void HandOver(string nextHolder)
+    {
+        var result = await NodeService.HandoverAsync(ContractId, Holder, nextHolder);
+        if (result.Status != "OK")
+        {
+            _message = result.Message;
+        }
+    }
+    
+    void Submit() => MudDialog.Close(DialogResult.Ok(true));
+    void Cancel() => MudDialog.Cancel();
+}

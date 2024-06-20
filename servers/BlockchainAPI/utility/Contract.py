@@ -1,4 +1,5 @@
-import asyncio, requests, json
+import json
+import httpx
 from web3 import Web3
 from config.config import Config
 import logging
@@ -8,27 +9,6 @@ web3 = Web3(Web3.HTTPProvider(Config.RPC_URL))
 contract = web3.eth.contract(address=Config.PUBLIC_KEY, abi=Config.ABI)
 
 logger = logging.getLogger(__name__)
-
-
-def handle_event(event):
-    event_json = web3.to_json(event)
-    logger.info(f"Event: {event_json}")
-    data = json.loads(event_json)
-
-    body = {
-            "holder": data["args"]["holder"],
-            "new_holder": data["args"]["new_holder"],
-            "agreement_id": data["args"]["agreement_id"]
-    }
-    response = requests.post(url=Config.CLIENT + "/events", json=body).json()
-
-
-async def listen():
-    while True:
-        event_filter = contract.events.transferProduct.create_filter(fromBlock='latest')
-        for event in event_filter.get_new_entries():
-            handle_event(event)
-        await asyncio.sleep(5)
 
 
 def process_receipt(tx_receipt):
